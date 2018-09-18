@@ -7,7 +7,7 @@ import inquirer from 'inquirer';
 import childProcess from 'child_process';
 import path from 'path';
 import url from 'url';
-import GitUtils from './GitUtils'
+import GitUtils from './GitUtils';
 import { getConfigFilePath, getPkg, getOrCreateWorkDir } from './utils';
 import { Configuration, ConfigurableKeys } from './constants';
 
@@ -46,16 +46,13 @@ function copyFiles(src: string, dest: string) {
   fs.copySync(src, dest);
 }
 
-function updateContent(
-  repoDir: string,
-  contentDir: string
-) {
+function updateContent(repoDir: string, contentDir: string) {
   clearDir(repoDir);
   copyFiles(contentDir, repoDir);
   childProcess.execSync('git add .', { cwd: repoDir });
 }
 
-async function commit(repoDir: string) {
+async function getCommitMessage(repoDir: string) {
   const ans = await inquirer.prompt<{ message: string }>([
     {
       type: 'editor',
@@ -68,14 +65,10 @@ async function commit(repoDir: string) {
       },
     },
   ]);
-  childProcess.execSync(`git commit -a -n -m '${ans.message}'`, { cwd: repoDir });
+  return ans.message;
 }
 
-async function updateTags(
-  repoDir: string,
-  name: string,
-  version: string
-) {
+async function updateTags(repoDir: string, name: string, version: string) {
   const macthed = version.match(/(\d+)\.(\d+)\.(\d+).*/);
   if (macthed == null) {
     console.error('版本号有误:', version);
@@ -133,20 +126,23 @@ async function updateTags(
 
 export default async function deploy() {
   // TODO: validate config
-  // TODO: 检查是否有内容变动
   // TODO: 提供commit模板
+  // TODO: 优化tag更新
   const conf = getConfig();
   const workdir = getOrCreateWorkDir();
   const pathname = url.parse(conf.remote).pathname || '/repo';
   const basename = path.basename(pathname, '.git');
   const repoDir = path.join(workdir, basename);
 
-  const repo = new GitUtils(workdir, repoDir, conf.remote, 'origin')
-  repo.initial()
-  repo.initialBranch(conf.name)
+  const repo = new GitUtils(workdir, repoDir, conf.remote, 'origin');
+  repo.initial();
+  repo.initialBranch(conf.name);
   updateContent(repoDir, conf.dist);
-  await commit(repoDir);
-  await updateTags(repoDir, conf.name, conf.version);
-  repo.push()
-  console.log('发布完成!')
+  if (repo.shouldCommit()) {
+    const message = await getCommitMessage(repoDir);
+    repo.commit('test');
+    await updateTags(repoDir, conf.name, conf.version);
+    repo.push();
+    console.log('发布完成!');
+  }
 }

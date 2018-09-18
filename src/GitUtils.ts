@@ -1,17 +1,41 @@
 /**
  * git 相关的帮助方法
  */
-import cp from "child_process";
-import url from "url";
-import path from "path";
-import fs from "fs-extra";
-import Log from "./Log";
+import cp from 'child_process';
+import url from 'url';
+import path from 'path';
+import fs from 'fs-extra';
+import Log from './Log';
+
+const StatusRegexp = /^([ADM? ])([ADM? ])\s(.+)$/;
 
 export interface BranchDesc {
   name: string;
   ref: string;
   remote: boolean;
 }
+
+export interface StatusDesc {
+  file: string;
+  stagedStatus: FileStatus;
+  unstagedStatus: FileStatus;
+}
+
+export enum FileStatus {
+  DELETED,
+  MODIFIED,
+  UNTRACKED,
+  ADDED,
+  NONE,
+}
+
+export const FileStatusMap: { [key: string]: FileStatus } = {
+  D: FileStatus.DELETED,
+  M: FileStatus.MODIFIED,
+  '?': FileStatus.UNTRACKED,
+  ' ': FileStatus.NONE,
+  A: FileStatus.ADDED,
+};
 
 export default class GitUtils {
   public workDir: string;
@@ -20,21 +44,16 @@ export default class GitUtils {
   public remoteName: string;
   public basename: string;
   public verbose: boolean = false;
-  public focusedBranch: string = "master";
+  public focusedBranch: string = 'master';
   public Logger = Log;
 
-  public constructor(
-    workDir: string,
-    repoDir: string,
-    remote: string,
-    remoteName: string = "origin"
-  ) {
+  public constructor(workDir: string, repoDir: string, remote: string, remoteName: string = 'origin') {
     this.workDir = workDir;
     this.repoDir = repoDir;
     this.remote = remote;
     this.remoteName = remoteName;
-    const pathname = url.parse(remote).pathname || "/repo";
-    this.basename = path.basename(pathname, ".git");
+    const pathname = url.parse(remote).pathname || '/repo';
+    this.basename = path.basename(pathname, '.git');
   }
 
   /**
@@ -55,7 +74,7 @@ export default class GitUtils {
   /**
    * 初始化分支
    */
-  public initialBranch(branchName: string = "master") {
+  public initialBranch(branchName: string = 'master') {
     const locals = this.getLocalBranches();
     if (locals.findIndex(i => i.name === branchName) === -1) {
       const remotes = this.getRemoteBranches();
@@ -68,14 +87,14 @@ export default class GitUtils {
 
     // created
     this.checkout(branchName);
-    this.focusedBranch = branchName
+    this.focusedBranch = branchName;
   }
 
   /**
    * 更新远程状态
    */
   public updateBranch() {
-    const cmd = `git pull -t --ff ${this.remoteName}`;
+    const cmd = `git pull -t --ff ${this.remoteName} master`;
     this.Logger.log(cmd);
     cp.execSync(cmd, { cwd: this.repoDir });
   }
@@ -115,35 +134,69 @@ export default class GitUtils {
   }
 
   public getLocalBranches() {
-    const refDir = path.join(this.repoDir, ".git/refs/heads");
+    const refDir = path.join(this.repoDir, '.git/refs/heads');
     return this.getFiles(refDir).map(item => ({
       name: item.name,
       ref: item.content,
-      remote: false
+      remote: false,
     }));
   }
 
   public getRemoteBranches() {
-    const refDir = path.join(
-      this.repoDir,
-      `.git/refs/remotes/${this.remoteName}`
-    );
+    const refDir = path.join(this.repoDir, `.git/refs/remotes/${this.remoteName}`);
 
     return this.getFiles(refDir)
       .filter(item => {
-        return ["HEAD"].indexOf(item.name) === -1;
+        return ['HEAD'].indexOf(item.name) === -1;
       })
       .map(item => ({
         name: item.name,
         ref: item.content,
-        remote: true
+        remote: true,
       }));
+  }
+
+  public commit(message: string) {
+    console.log(message);
+    const cmd = `git commit -n -m "${message}"`;
+    this.Logger.log(cmd);
+    cp.execSync(cmd, { cwd: this.repoDir });
+  }
+
+  public shouldCommit() {
+    return this.status().length !== 0;
+  }
+
+  public status(): StatusDesc[] {
+    const cmd = `git status -s`;
+    this.Logger.log(cmd);
+    const res = cp.execSync(cmd, { cwd: this.repoDir }).toString();
+    return res
+      .split('\n')
+      .filter(i => !!i)
+      .map(str => {
+        const matched = str.match(StatusRegexp);
+        if (!matched) {
+          return null;
+        }
+        const [stagedStatus, unstagedStatus, file] = matched.slice(1);
+        return {
+          file,
+          stagedStatus: this.mapStatusDesc(stagedStatus),
+          unstagedStatus: this.mapStatusDesc(unstagedStatus),
+        } as StatusDesc;
+      })
+      .filter(i => !!i) as StatusDesc[];
   }
 
   public push() {
     const cmd = `git push --tags ${this.remoteName} ${this.focusedBranch}`;
     this.Logger.log(cmd);
     cp.execSync(cmd, { cwd: this.repoDir });
+  }
+
+  private mapStatusDesc(desc: string): FileStatus {
+    return FileStatusMap[desc];
   }
 
   private getFiles(src: string) {
@@ -154,7 +207,7 @@ export default class GitUtils {
       return {
         absolutePath,
         content,
-        name
+        name,
       };
     });
   }
