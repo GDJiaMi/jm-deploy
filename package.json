@@ -1,0 +1,32 @@
+{
+  "name": "jm-deploy",
+  "version": "1.0.0",
+  "description": "CLI for deploy static to git repo.",
+  "main": "bin/index.js",
+  "bin": "bin/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "ts-node src/index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "ssh://git@code.ejiahe.com:25522/WEB/jm-deploy.git"
+  },
+  "author": "ivan",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/inquirer": "^0.0.43",
+    "@types/node": "^10.10.1",
+    "@types/nodegit": "^0.22.3",
+    "ts-node": "^7.0.1",
+    "typescript": "~2.9.0"
+  },
+  "dependencies": {
+    "commander": "^2.18.0",
+    "inquirer": "^6.2.0",
+    "nodegit": "^0.22.2",
+    "simple-git": "^1.100.0",
+    "tslib": "^1.9.3"
+  }
+}
