@@ -94,13 +94,17 @@ export default class GitUtils {
   public updateBranches() {
     const cmd = `git pull --tags --ff -f --all`
     this.Logger.log(cmd)
-    cp.execSync(cmd, {cwd: this.repoDir})
+    cp.execSync(cmd, { cwd: this.repoDir })
   }
 
   /**
    * 更新远程状态
    */
   public updateBranch(branch: string = 'master') {
+    if (!this.hasRemoteBranch(branch)) {
+      return
+    }
+
     const cmd = `git pull -t --ff ${this.remoteName} ${branch}`
     this.Logger.log(cmd)
     cp.execSync(cmd, { cwd: this.repoDir })
@@ -133,6 +137,11 @@ export default class GitUtils {
     return cp.execSync(cmd, { cwd: this.repoDir }).toString()
   }
 
+  public hasRemoteBranch(branch: string) {
+    const branches = this.getRemoteBranches()
+    return branches.findIndex(i => i.name === branch) !== -1
+  }
+
   /**
    * 获取所有分支，需要在调用前pull一下
    */
@@ -149,10 +158,14 @@ export default class GitUtils {
     }))
   }
 
+  private remoteBranches: BranchDesc[] = []
   public getRemoteBranches() {
+    if (this.remoteBranches.length) {
+      return this.remoteBranches
+    }
     const refDir = path.join(this.repoDir, `.git/refs/remotes/${this.remoteName}`)
 
-    return this.getFiles(refDir)
+    return (this.remoteBranches = this.getFiles(refDir)
       .filter(item => {
         return ['HEAD'].indexOf(item.name) === -1
       })
@@ -160,7 +173,7 @@ export default class GitUtils {
         name: item.name,
         ref: item.content,
         remote: true,
-      }))
+      })))
   }
 
   public commit(message: string) {
@@ -202,7 +215,7 @@ export default class GitUtils {
   }
 
   public push(force?: boolean) {
-    const cmd = `git push --tags ${this.remoteName} ${this.focusedBranch} ${force ? '-f' : ''}`
+    const cmd = `git push -u --tags ${this.remoteName} ${this.focusedBranch} ${force ? '-f' : ''}`
     this.Logger.log(cmd)
     cp.execSync(cmd, { cwd: this.repoDir })
   }
