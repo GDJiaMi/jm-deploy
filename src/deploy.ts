@@ -8,7 +8,7 @@ import childProcess from 'child_process'
 import path from 'path'
 import url from 'url'
 import GitUtils from './GitUtils'
-import { getConfigFilePath, getPkg, getOrCreateWorkDir } from './utils'
+import { getConfigFilePath, getPkg, getOrCreateWorkDir, getTemplateFileSync } from './utils'
 import { Configuration, ConfigurableKeys } from './constants'
 
 function getConfig(): Configuration {
@@ -113,8 +113,10 @@ export default async function deploy() {
   updateContent(repoDir, conf.dist)
   if (repo.shouldCommit()) {
     const message = await getCommitMessage(repoDir)
-    repo.commit(message)
-    updateTags(repo, conf.name, conf.version)
+    getTemplateFileSync(message, file => {
+      repo.commitByFile(file)
+    })
+    await updateTags(repo, conf.name, conf.version)
     repo.push(true)
     console.log('发布完成!')
   }

@@ -162,6 +162,12 @@ export default class GitUtils {
     cp.execSync(cmd, { cwd: this.repoDir })
   }
 
+  public commitByFile(file?: string) {
+    const cmd = `git commit -n ${file ? `-F ${file}` : ''}`
+    this.Logger.log(cmd)
+    cp.execSync(cmd, { cwd: this.repoDir })
+  }
+
   public shouldCommit() {
     return this.status().length !== 0
   }
