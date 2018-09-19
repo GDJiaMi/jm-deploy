@@ -8,11 +8,12 @@ import fs from 'fs-extra'
 import Log from './Log'
 
 const StatusRegexp = /^([ADM? ])([ADM? ])\s(.+)$/
+const LocalBranchRegexp = /^(\*?)\s+(\S*)$/
 
 export interface BranchDesc {
   name: string
-  ref: string
   remote: boolean
+  current?: boolean
 }
 
 export interface StatusDesc {
@@ -80,6 +81,7 @@ export default class GitUtils {
       cp.execSync(cmd, this.getExecOptions(true, this.workDir))
     } else {
       // 更新状态
+      this.switchBranch('master')
       this.updateBranches()
     }
   }
@@ -88,11 +90,9 @@ export default class GitUtils {
    * 初始化分支
    */
   public initialBranch(branchName: string = 'master') {
-    const locals = this.getLocalBranches()
-    if (locals.findIndex(i => i.name === branchName) === -1) {
-      const remotes = this.getRemoteBranches()
-      if (remotes.findIndex(i => i.name === branchName) === -1) {
-        this.Logger.info("分支不存在，正在创建...")
+    if (!this.hasLocalBranch(branchName)) {
+      if (!this.hasRemoteBranch(branchName)) {
+        this.Logger.info('分支不存在，正在创建...')
         // 本地和远程都不存在, 创建分支
         const masterCommit = this.getMasterCommit()
         this.createBranch(branchName, masterCommit)
@@ -115,10 +115,6 @@ export default class GitUtils {
    * 更新远程状态
    */
   public updateBranch(branch: string = 'master') {
-    if (!this.hasRemoteBranch(branch)) {
-      return
-    }
-
     const cmd = `git pull -t --ff ${this.remoteName} ${branch}`
     this.Logger.log(cmd)
     cp.execSync(cmd, this.getExecOptions(true))
@@ -177,6 +173,11 @@ export default class GitUtils {
     return branches.findIndex(i => i.name === branch) !== -1
   }
 
+  public hasLocalBranch(branch: string) {
+    const branches = this.getLocalBranches()
+    return branches.findIndex(i => i.name === branch) !== -1
+  }
+
   /**
    * 获取所有分支，需要在调用前pull一下
    */
@@ -185,30 +186,57 @@ export default class GitUtils {
   }
 
   public getLocalBranches() {
-    const refDir = path.join(this.repoDir, '.git/refs/heads')
-    return this.getFiles(refDir).map(item => ({
-      name: item.name,
-      ref: item.content,
-      remote: false,
-    }))
+    const cmd = `git branch`
+    this.Logger.log(cmd)
+    const res = cp.execSync(cmd, this.getExecOptions()).toString()
+    return res
+      .split('\n')
+      .map(i => {
+        if (i === '') {
+          return null
+        }
+        const matched = i.match(LocalBranchRegexp)
+        if (matched == null) {
+          return matched
+        }
+
+        const [current, name] = matched.slice(1)
+        return {
+          name: name,
+          remote: false,
+          current: current === '*',
+        }
+      })
+      .filter(i => !!i) as BranchDesc[]
   }
 
-  private remoteBranches: BranchDesc[] = []
   public getRemoteBranches() {
-    if (this.remoteBranches.length) {
-      return this.remoteBranches
-    }
-    const refDir = path.join(this.repoDir, `.git/refs/remotes/${this.remoteName}`)
+    const cmd = `git branch -r`
+    this.Logger.log(cmd)
+    const res = cp.execSync(cmd, this.getExecOptions()).toString()
 
-    return (this.remoteBranches = this.getFiles(refDir)
-      .filter(item => {
-        return ['HEAD'].indexOf(item.name) === -1
+    const matchRegexp = new RegExp(`^\\s+${this.remoteName}/(\\S*)$`)
+
+    return res
+      .split('\n')
+      .map(i => {
+        if (i === '') {
+          return null
+        }
+
+        const matched = i.match(matchRegexp)
+        if (matched == null) {
+          return matched
+        }
+
+        const [name] = matched.slice(1)
+        return {
+          name: name,
+          remote: true,
+          current: false,
+        }
       })
-      .map(item => ({
-        name: item.name,
-        ref: item.content,
-        remote: true,
-      })))
+      .filter(i => !!i) as BranchDesc[]
   }
 
   public commit(message: string) {
