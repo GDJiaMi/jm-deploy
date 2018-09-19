@@ -67,7 +67,7 @@ export default class GitUtils {
       cp.execSync(cmd, { cwd: this.workDir })
     } else {
       // 更新状态
-      this.updateBranch()
+      this.updateBranches()
     }
   }
 
@@ -88,13 +88,20 @@ export default class GitUtils {
     // created
     this.checkout(branchName)
     this.focusedBranch = branchName
+    this.updateBranch(branchName)
+  }
+
+  public updateBranches() {
+    const cmd = `git pull --tags --ff -f --all`
+    this.Logger.log(cmd)
+    cp.execSync(cmd, {cwd: this.repoDir})
   }
 
   /**
    * 更新远程状态
    */
-  public updateBranch() {
-    const cmd = `git pull -t --ff ${this.remoteName} master`
+  public updateBranch(branch: string = 'master') {
+    const cmd = `git pull -t --ff ${this.remoteName} ${branch}`
     this.Logger.log(cmd)
     cp.execSync(cmd, { cwd: this.repoDir })
   }
