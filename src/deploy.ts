@@ -8,6 +8,7 @@ import childProcess from 'child_process'
 import path from 'path'
 import url from 'url'
 import GitUtils from './GitUtils'
+import template from './template'
 import { getConfigFilePath, getPkg, getOrCreateWorkDir, getTemplateFileSync } from './utils'
 import { Configuration, ConfigurableKeys } from './constants'
 
@@ -52,11 +53,12 @@ function updateContent(repoDir: string, contentDir: string) {
   childProcess.execSync('git add .', { cwd: repoDir })
 }
 
-async function getCommitMessage(repoDir: string) {
+async function getCommitMessage(defaultMessage: string) {
   const ans = await inquirer.prompt<{ message: string }>([
     {
       type: 'editor',
       name: 'message',
+      default: defaultMessage,
       validate: (v: string) => {
         if (v == null || v.trim() === '') {
           return '不能为空'
@@ -99,8 +101,7 @@ async function updateTags(repo: GitUtils, name: string, version: string) {
 }
 
 export default async function deploy() {
-  // TODO: validate config
-  // TODO: 提供commit模板
+  const cwd = process.cwd()
   const conf = getConfig()
   const workdir = getOrCreateWorkDir()
   const pathname = url.parse(conf.remote).pathname || '/repo'
@@ -112,7 +113,15 @@ export default async function deploy() {
   repo.initialBranch(conf.name)
   updateContent(repoDir, conf.dist)
   if (repo.shouldCommit()) {
-    const message = await getCommitMessage(repoDir)
+    const lastCommit = GitUtils.getLastCommitMessage(cwd)
+    const message = await getCommitMessage(
+      template({
+        name: conf.name,
+        version: conf.version,
+        title: lastCommit.title,
+        body: lastCommit.body,
+      }),
+    )
     getTemplateFileSync(message, file => {
       repo.commitByFile(file)
     })

@@ -47,6 +47,19 @@ export default class GitUtils {
   public focusedBranch: string = 'master'
   public Logger = Log
 
+  public static getLastCommitMessage(repoDir: string) {
+    try {
+      const title = cp.execSync(`git log -1 --pretty=format:"%s"`, { cwd: repoDir }).toString()
+      const body = cp.execSync(`git log -1 --pretty=format:"%b"`, { cwd: repoDir }).toString()
+      return {
+        title,
+        body,
+      }
+    } catch {
+      return { title: '', body: '' }
+    }
+  }
+
   public constructor(workDir: string, repoDir: string, remote: string, remoteName: string = 'origin') {
     this.workDir = workDir
     this.repoDir = repoDir
