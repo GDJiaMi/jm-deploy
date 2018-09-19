@@ -77,7 +77,7 @@ export default class GitUtils {
       // 仓库不存在
       const cmd = `git clone ${this.remote} ${this.basename}`
       this.Logger.log(cmd)
-      cp.execSync(cmd, { cwd: this.workDir })
+      cp.execSync(cmd, this.getExecOptions(true, this.workDir))
     } else {
       // 更新状态
       this.updateBranches()
@@ -92,6 +92,7 @@ export default class GitUtils {
     if (locals.findIndex(i => i.name === branchName) === -1) {
       const remotes = this.getRemoteBranches()
       if (remotes.findIndex(i => i.name === branchName) === -1) {
+        this.Logger.info("分支不存在，正在创建...")
         // 本地和远程都不存在, 创建分支
         const masterCommit = this.getMasterCommit()
         this.createBranch(branchName, masterCommit)
@@ -99,7 +100,7 @@ export default class GitUtils {
     }
 
     // created
-    this.checkout(branchName)
+    this.switchBranch(branchName)
     this.focusedBranch = branchName
     this.updateBranch(branchName)
   }
@@ -107,38 +108,53 @@ export default class GitUtils {
   public updateBranches() {
     const cmd = `git pull --tags --ff -f --all`
     this.Logger.log(cmd)
-    cp.execSync(cmd, { cwd: this.repoDir })
+    cp.execSync(cmd, this.getExecOptions(true))
   }
 
   /**
    * 更新远程状态
    */
-  public updateBranch(branch: string = 'master', quiet: boolean = !this.Logger.enabled) {
+  public updateBranch(branch: string = 'master') {
     if (!this.hasRemoteBranch(branch)) {
       return
     }
 
-    const cmd = `git pull -t --ff ${quiet ? '-q' : ''} ${this.remoteName} ${branch}`
+    const cmd = `git pull -t --ff ${this.remoteName} ${branch}`
     this.Logger.log(cmd)
-    cp.execSync(cmd, { cwd: this.repoDir })
+    cp.execSync(cmd, this.getExecOptions(true))
   }
 
-  public createBranch(name: string, commit: string) {
+  public createBranch(name: string, commit: string, setUpStream: boolean = true) {
     const cmd = `git checkout -b ${name} ${commit}`
     this.Logger.log(cmd)
-    cp.execSync(cmd, { cwd: this.repoDir })
+    cp.execSync(cmd, this.getExecOptions(true))
+
+    if (setUpStream) {
+      const cmd = `git push -u ${this.remoteName} ${name}`
+      this.Logger.log(cmd)
+      cp.execSync(cmd, this.getExecOptions(true))
+    }
   }
 
-  public checkout(ref: string, quiet: boolean = !this.Logger.enabled) {
-    const cmd = `git checkout ${ref} ${quiet ? '-q' : ''}`
+  public switchBranch(name: string, setUpStream: boolean = true) {
+    this.checkout(name)
+    if (setUpStream) {
+      const cmd = `git branch --set-upstream-to=${this.remoteName}/${name} ${name}`
+      this.Logger.log(cmd)
+      cp.execSync(cmd, this.getExecOptions(true))
+    }
+  }
+
+  public checkout(ref: string) {
+    const cmd = `git checkout ${ref}`
     this.Logger.log(cmd)
-    cp.execSync(cmd, { cwd: this.repoDir })
+    cp.execSync(cmd, this.getExecOptions(true))
   }
 
   public addAll() {
     const cmd = `git add .`
     this.Logger.log(cmd)
-    cp.execSync(cmd, { cwd: this.repoDir })
+    cp.execSync(cmd, this.getExecOptions(true))
   }
 
   /**
@@ -147,13 +163,13 @@ export default class GitUtils {
   public getMasterCommit() {
     const cmd = `git rev-parse master`
     this.Logger.log(cmd)
-    return cp.execSync(cmd, { cwd: this.repoDir }).toString()
+    return cp.execSync(cmd, this.getExecOptions()).toString()
   }
 
   public getBranchCommit(branch: string) {
     const cmd = `git rev-parse ${branch}`
     this.Logger.log(cmd)
-    return cp.execSync(cmd, { cwd: this.repoDir }).toString()
+    return cp.execSync(cmd, this.getExecOptions()).toString()
   }
 
   public hasRemoteBranch(branch: string) {
@@ -198,13 +214,13 @@ export default class GitUtils {
   public commit(message: string) {
     const cmd = `git commit -n -m "${message}"`
     this.Logger.log(cmd)
-    cp.execSync(cmd, { cwd: this.repoDir })
+    cp.execSync(cmd, this.getExecOptions(true))
   }
 
   public commitByFile(file?: string) {
     const cmd = `git commit -n ${file ? `-F ${file}` : ''}`
     this.Logger.log(cmd)
-    cp.execSync(cmd, { cwd: this.repoDir })
+    cp.execSync(cmd, this.getExecOptions(true))
   }
 
   public shouldCommit() {
@@ -214,7 +230,7 @@ export default class GitUtils {
   public status(): StatusDesc[] {
     const cmd = `git status -s`
     this.Logger.log(cmd)
-    const res = cp.execSync(cmd, { cwd: this.repoDir }).toString()
+    const res = cp.execSync(cmd, this.getExecOptions()).toString()
     return res
       .split('\n')
       .filter(i => !!i)
@@ -236,14 +252,14 @@ export default class GitUtils {
   public push(force?: boolean) {
     const cmd = `git push -u --tags ${this.remoteName} ${this.focusedBranch} ${force ? '-f' : ''}`
     this.Logger.log(cmd)
-    cp.execSync(cmd, { cwd: this.repoDir })
+    cp.execSync(cmd, this.getExecOptions(true))
   }
 
   public getTags(): string[] {
     const cmd = `git tag --list`
     this.Logger.log(cmd)
     return cp
-      .execSync(cmd, { cwd: this.repoDir })
+      .execSync(cmd, this.getExecOptions())
       .toString()
       .split('\n')
       .filter(i => !!i)
@@ -255,7 +271,7 @@ export default class GitUtils {
   public removeTag(name: string, remote: boolean = false) {
     const cmd = !remote ? `git tag --delete ${name}` : `git push ${this.remoteName} --delete tag ${name}`
     this.Logger.log(cmd)
-    cp.execSync(cmd, { cwd: this.repoDir })
+    cp.execSync(cmd, this.getExecOptions(true))
   }
 
   /**
@@ -264,7 +280,7 @@ export default class GitUtils {
   public addTag(name: string, message?: string) {
     const cmd = message == null ? `git tag ${name}` : `git tag -a ${name} -m "${message}"`
     this.Logger.log(cmd)
-    cp.execSync(cmd, { cwd: this.repoDir })
+    cp.execSync(cmd, this.getExecOptions(true))
   }
 
   /**
@@ -273,7 +289,7 @@ export default class GitUtils {
   public addOrReplaceTag(name: string, message?: string) {
     const cmd = message == null ? `git tag ${name} -f` : `git tag -a ${name} -m "${message}" -f`
     this.Logger.log(cmd)
-    cp.execSync(cmd, { cwd: this.repoDir })
+    cp.execSync(cmd, this.getExecOptions(true))
   }
 
   private mapStatusDesc(desc: string): FileStatus {
@@ -291,5 +307,12 @@ export default class GitUtils {
         name,
       }
     })
+  }
+
+  private getExecOptions(quietable: boolean = false, cwd: string = this.repoDir): cp.ExecSyncOptions {
+    return {
+      cwd,
+      stdio: (quietable && !this.Logger.enabled && 'ignore') || undefined,
+    }
   }
 }

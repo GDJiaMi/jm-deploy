@@ -1,6 +1,5 @@
 import inquirer from 'inquirer';
 import fs from 'fs';
-import path from 'path';
 import { getConfigFilePath } from './utils';
 import { ConfigurableKeys } from './constants';
 

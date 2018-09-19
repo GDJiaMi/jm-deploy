@@ -1,6 +1,7 @@
 import fs from 'fs-extra'
 import os from 'os'
 import glob from 'glob'
+import Log from './Log'
 import path from 'path'
 import { CONFIG_FILE, WORK_DIR } from './constants'
 
@@ -17,7 +18,7 @@ export function getPkg(): Pkg {
   const currentDir = process.cwd()
   const pkgPath = path.join(currentDir, 'package.json')
   if (!fs.existsSync(pkgPath)) {
-    console.error('package.json not found')
+    Log.error('package.json not found')
     process.exit(-1)
   }
   return require(pkgPath)

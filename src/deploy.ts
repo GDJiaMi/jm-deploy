@@ -32,7 +32,7 @@ async function getCommitMessage(defaultMessage: string) {
 async function updateTags(repo: GitUtils, name: string, version: string) {
   const macthed = version.match(/(\d+)\.(\d+)\.(\d+).*/)
   if (macthed == null) {
-    console.error('版本号有误:', version)
+    Log.error('版本号有误:', version)
     process.exit(-1)
     return
   }
@@ -94,6 +94,8 @@ export default async function deploy() {
     Log.info("更新tags...")
     await updateTags(repo, conf.name, conf.version)
     repo.push(true)
-    Log.log('发布完成!')
+    Log.tip('发布完成!')
+  } else {
+    Log.tip('暂无提交内容，退出')
   }
 }
