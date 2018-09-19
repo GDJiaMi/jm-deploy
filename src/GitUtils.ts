@@ -113,12 +113,12 @@ export default class GitUtils {
   /**
    * 更新远程状态
    */
-  public updateBranch(branch: string = 'master') {
+  public updateBranch(branch: string = 'master', quiet: boolean = !this.Logger.enabled) {
     if (!this.hasRemoteBranch(branch)) {
       return
     }
 
-    const cmd = `git pull -t --ff ${this.remoteName} ${branch}`
+    const cmd = `git pull -t --ff ${quiet ? '-q' : ''} ${this.remoteName} ${branch}`
     this.Logger.log(cmd)
     cp.execSync(cmd, { cwd: this.repoDir })
   }
@@ -129,8 +129,14 @@ export default class GitUtils {
     cp.execSync(cmd, { cwd: this.repoDir })
   }
 
-  public checkout(ref: string) {
-    const cmd = `git checkout ${ref}`
+  public checkout(ref: string, quiet: boolean = !this.Logger.enabled) {
+    const cmd = `git checkout ${ref} ${quiet ? '-q' : ''}`
+    this.Logger.log(cmd)
+    cp.execSync(cmd, { cwd: this.repoDir })
+  }
+
+  public addAll() {
+    const cmd = `git add .`
     this.Logger.log(cmd)
     cp.execSync(cmd, { cwd: this.repoDir })
   }

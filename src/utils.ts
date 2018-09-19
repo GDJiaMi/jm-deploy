@@ -1,5 +1,6 @@
 import fs from 'fs-extra'
 import os from 'os'
+import glob from 'glob'
 import path from 'path'
 import { CONFIG_FILE, WORK_DIR } from './constants'
 
@@ -54,4 +55,25 @@ export function getTemplateFileSync(content: string, wrapper: (filePath: string)
   } finally {
     fs.removeSync(tmpFile)
   }
+}
+
+export function clearDir(path: string) {
+  const items = glob.sync('*', {
+    cwd: path,
+    dot: false,
+    absolute: true,
+  })
+  items.forEach(item => fs.removeSync(item))
+}
+
+export function copyFiles(src: string, dest: string) {
+  fs.copySync(src, dest)
+}
+
+/**
+ * 清除并复制目录
+ */
+export function clearAndCopy(src: string, dest: string) {
+  clearDir(dest)
+  copyFiles(src, dest)
 }

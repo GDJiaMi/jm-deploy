@@ -5,4 +5,10 @@ export default class Log {
       console.log(...args);
     }
   };
+
+  public static info: typeof console.log = (...args: any[]) => {
+    if (Log.enabled) {
+      console.log(...args);
+    }
+  };
 }

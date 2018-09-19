@@ -8,8 +8,7 @@ export interface TemplateLocal {
   body?: string
 }
 
-export default (local: TemplateLocal) => `
-${local.name} ${local.version} ${local.body || '标题'}
+export default (local: TemplateLocal) => `${local.name} ${local.version} ${local.title || '标题'}
 
 ${local.body || '主要描述'}
 
