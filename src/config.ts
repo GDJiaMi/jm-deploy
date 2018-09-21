@@ -13,7 +13,7 @@ export default function getConfig(): Configuration {
   const conf = require(configPath) as ConfigurableKeys
 
   if (!fs.existsSync(conf.dist)) {
-    Log.error(`${conf.dist} is not found.`)
+    Log.error(`目录 ${conf.dist} 不存在`)
     process.exit(-1)
   }
 

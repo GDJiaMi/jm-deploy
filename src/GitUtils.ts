@@ -9,6 +9,7 @@ import Log from './Log'
 
 const StatusRegexp = /^([ADM? ])([ADM? ])\s(.+)$/
 const LocalBranchRegexp = /^(\*?)\s+(\S*)$/
+const VersionTagRegexp = /^(.*)\/(\d+)\.(\d+)\.(\d+.*)$/
 
 export interface BranchDesc {
   name: string
@@ -20,6 +21,14 @@ export interface StatusDesc {
   file: string
   stagedStatus: FileStatus
   unstagedStatus: FileStatus
+}
+
+export interface VersionTagDesc {
+  raw: string
+  name: string
+  major: number
+  minor: number
+  patch: number
 }
 
 export enum FileStatus {
@@ -291,6 +300,64 @@ export default class GitUtils {
       .toString()
       .split('\n')
       .filter(i => !!i)
+  }
+
+  public hasTag(tag: string): boolean {
+    const tags = this.getTags()
+    return tags.indexOf(tag) !== -1
+  }
+
+  public getTagsStartWith(path: string) {
+    return this.getTags().filter(t => t.startsWith(path))
+  }
+
+  public getTagsAndSortByVersion(path: string): VersionTagDesc[] {
+    return (this.getTagsStartWith(path)
+      .map(tag => this.getVersionOnTag(tag))
+      .filter(v => !!v) as VersionTagDesc[]).sort((a, b) => this.versionComparator(b, a))
+  }
+
+  public versionComparator(a: VersionTagDesc, b: VersionTagDesc) {
+    if (a.major > b.major) {
+      return 1
+    } else if (a.major < b.major) {
+      return -1
+    } else {
+      if (a.minor > b.minor) {
+        return 1
+      } else if (a.minor < b.minor) {
+        return -1
+      } else {
+        return a.patch - b.patch
+      }
+    }
+  }
+
+  /**
+   * tag 版本号比较
+   */
+  public isNewerThan(a: VersionTagDesc, b: VersionTagDesc) {
+    return this.versionComparator(a, b) === 1
+  }
+
+  public isNewerOrEqualThan(a: VersionTagDesc, b: VersionTagDesc) {
+    const res = this.versionComparator(a, b)
+    return res === 1 || res === 0
+  }
+
+  public getVersionOnTag(tag: string) {
+    const matched = tag.match(VersionTagRegexp)
+    if (matched) {
+      const [name, major, minor, patch] = matched.slice(1)
+      return {
+        raw: tag,
+        name,
+        major: parseInt(major, 10),
+        minor: parseInt(minor, 10),
+        patch: parseInt(patch, 10),
+      }
+    }
+    return null
   }
 
   /**
