@@ -47,52 +47,45 @@ export const FileStatusMap: { [key: string]: FileStatus } = {
   A: FileStatus.ADDED,
 }
 
+export function createGitUtils(repoDir: string, remote?: string, remoteName: string = 'origin'): GitUtils {
+  if (remote) {
+    const workDir = path.dirname(repoDir)
+    const pathname = url.parse(remote).pathname || '/repo'
+    const basename = path.basename(pathname, '.git')
+
+    if (!fs.existsSync(repoDir)) {
+      // 仓库不存在
+      const cmd = `git clone ${remote} ${basename}`
+      Log.log(cmd)
+      cp.execSync(cmd, {
+        cwd: workDir,
+        stdio: (!Log.enabled && 'ignore') || undefined,
+      })
+    }
+  }
+
+  return new GitUtils(repoDir, remoteName)
+}
+
 export default class GitUtils {
-  public workDir: string
   public repoDir: string
-  public remote: string
   public remoteName: string
-  public basename: string
   public verbose: boolean = false
   public focusedBranch: string = 'master'
   public Logger = Log
 
-  public static getLastCommitMessage(repoDir: string) {
-    try {
-      const title = cp.execSync(`git log -1 --pretty=format:"%s"`, { cwd: repoDir }).toString()
-      const body = cp.execSync(`git log -1 --pretty=format:"%b"`, { cwd: repoDir }).toString()
-      return {
-        title,
-        body,
-      }
-    } catch {
-      return { title: '', body: '' }
-    }
-  }
-
-  public constructor(workDir: string, repoDir: string, remote: string, remoteName: string = 'origin') {
-    this.workDir = workDir
+  public constructor(repoDir: string, remoteName: string = 'origin') {
     this.repoDir = repoDir
-    this.remote = remote
     this.remoteName = remoteName
-    const pathname = url.parse(remote).pathname || '/repo'
-    this.basename = path.basename(pathname, '.git')
   }
 
   /**
    * 初始化版本库
    */
   public initial() {
-    if (!fs.existsSync(this.repoDir)) {
-      // 仓库不存在
-      const cmd = `git clone ${this.remote} ${this.basename}`
-      this.Logger.log(cmd)
-      cp.execSync(cmd, this.getExecOptions(true, this.workDir))
-    } else {
-      // 更新状态
-      this.switchBranch('master')
-      this.updateBranches()
-    }
+    // 更新状态
+    this.switchBranch('master')
+    this.updateBranches()
   }
 
   /**
@@ -175,6 +168,24 @@ export default class GitUtils {
     const cmd = `git rev-parse ${branch}`
     this.Logger.log(cmd)
     return cp.execSync(cmd, this.getExecOptions()).toString()
+  }
+
+  public getLastCommitMessage() {
+    try {
+      const title = cp.execSync(`git log -1 --pretty=format:"%s"`, this.getExecOptions()).toString()
+      const body = cp.execSync(`git log -1 --pretty=format:"%b"`, this.getExecOptions()).toString()
+      return {
+        title,
+        body,
+      }
+    } catch {
+      return { title: '', body: '' }
+    }
+  }
+
+  public getLastCommitMessageTitles(n: number) {
+    const title = cp.execSync(`git log -n ${n} --pretty=format:"%s"`, this.getExecOptions()).toString() || ''
+    return title.split('\n').filter(i => !!i)
   }
 
   public hasRemoteBranch(branch: string) {

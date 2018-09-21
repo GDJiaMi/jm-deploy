@@ -11,6 +11,12 @@ export interface Pkg {
   version: string
 }
 
+export interface Version {
+  major: string
+  minor: string
+  patch: string
+}
+
 /**
  * 获取当前项目的package.json 文件
  */
@@ -47,7 +53,7 @@ export function getOrCreateWorkDir() {
 /**
  * 获取临时文件并自动删除
  */
-export function getTemplateFileSync(content: string, wrapper: (filePath: string) => void) {
+export function getTempFileSync(content: string, wrapper: (filePath: string) => void) {
   const workdir = getOrCreateWorkDir()
   const tmpFile = path.join(workdir, 'tmp/template')
   try {
@@ -77,4 +83,16 @@ export function copyFiles(src: string, dest: string) {
 export function clearAndCopy(src: string, dest: string) {
   clearDir(dest)
   copyFiles(src, dest)
+}
+
+/**
+ * 解析版本号
+ */
+export function parseVersion(version: string): Version | null {
+  const macthed = version.match(/(\d+)\.(\d+)\.(\d+).*/)
+  if (macthed == null) {
+    return null
+  }
+  const [major, minor, patch] = macthed.slice(1)
+  return { major, minor, patch }
 }
