@@ -59,7 +59,7 @@ async function checkVersionConflit(repo: GitUtils, name: string, version: Versio
     // 冲突了
     const ans = await inquirer.prompt<{ ok: boolean }>({
       type: 'confirm',
-      message: `版本: ${tagName} 已经存在, 是否覆盖?: `,
+      message: `版本: ${tagName} 已经存在, 是否覆盖? 注意避免覆盖, 尽量和后端应用的大版本保持一致: `,
       name: 'ok',
     })
 
