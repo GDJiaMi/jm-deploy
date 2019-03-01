@@ -61,6 +61,27 @@ export function createGitUtils(repoDir: string, remote?: string, remoteName: str
         cwd: workDir,
         stdio: (!Log.enabled && 'ignore') || undefined,
       })
+    } else {
+      const repoDir = path.join(workDir, basename)
+      // 仓库存在，需要重置remote
+      try {
+        let cmd = `git remote remove ${remoteName}`
+        Log.log(cmd)
+        cp.execSync(cmd, {
+          cwd: repoDir,
+          stdio: (!Log.enabled && 'ignore') || undefined,
+        })
+
+        cmd = `git remote add ${remoteName} ${remote} && git fetch`
+        Log.log(cmd)
+        cp.execSync(cmd, {
+          cwd: repoDir,
+          stdio: (!Log.enabled && 'ignore') || undefined,
+        })
+      } catch (err) {
+        Log.log(`重置remote失败:`, err)
+        process.exit(1)
+      }
     }
   }
 
@@ -203,6 +224,13 @@ export default class GitUtils {
    */
   public getAllBranches() {
     return this.getLocalBranches().concat(this.getRemoteBranches())
+  }
+
+  /**
+   * 获取当前分支名称
+   */
+  public getCurrentBranch() {
+    return this.getLocalBranches().find(i => !!i.current)!
   }
 
   public getLocalBranches() {

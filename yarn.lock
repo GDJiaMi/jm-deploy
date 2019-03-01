@@ -35,13 +35,6 @@
   version "10.10.1"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-10.10.1.tgz#d5c96ca246a418404914d180b7fdd625ad18eca6"
 
-"@types/nodegit@^0.22.3":
-  version "0.22.3"
-  resolved "https://registry.yarnpkg.com/@types/nodegit/-/nodegit-0.22.3.tgz#4f127bf57b0ef42dbc014cee2ca60002c1322a81"
-  dependencies:
-    "@types/events" "*"
-    "@types/node" "*"
-
 "@types/rx-core-binding@*":
   version "4.0.4"
   resolved "https://registry.yarnpkg.com/@types/rx-core-binding/-/rx-core-binding-4.0.4.tgz#d969d32f15a62b89e2862c17b3ee78fe329818d3"
@@ -209,12 +202,6 @@ concat-map@0.0.1:
   version "0.0.1"
   resolved "https://registry.yarnpkg.com/concat-map/-/concat-map-0.0.1.tgz#d8a96bd77fd68df7793a73036a3ba0d5405d477b"
 
-debug@^4.0.1:
-  version "4.0.1"
-  resolved "https://registry.yarnpkg.com/debug/-/debug-4.0.1.tgz#f9bb36d439b8d1f0dd52d8fb6b46e4ebb8c1cd5b"
-  dependencies:
-    ms "^2.1.1"
-
 diff@^3.1.0:
   version "3.5.0"
   resolved "https://registry.yarnpkg.com/diff/-/diff-3.5.0.tgz#800c0dd1e0a8bfbc95835c202ad220fe317e5a12"
@@ -349,10 +336,6 @@ mkdirp@^0.5.1:
   dependencies:
     minimist "0.0.8"
 
-ms@^2.1.1:
-  version "2.1.1"
-  resolved "https://registry.yarnpkg.com/ms/-/ms-2.1.1.tgz#30a5864eb3ebb0a66f2ebe6d727af06a09d86e0a"
-
 mute-stream@0.0.7:
   version "0.0.7"
   resolved "https://registry.yarnpkg.com/mute-stream/-/mute-stream-0.0.7.tgz#3075ce93bc21b8fab43e1bc4da7e8115ed1e7bab"
@@ -403,12 +386,6 @@ rxjs@^6.1.0:
 signal-exit@^3.0.2:
   version "3.0.2"
   resolved "https://registry.yarnpkg.com/signal-exit/-/signal-exit-3.0.2.tgz#b5fdc08f1287ea1178628e415e25132b73646c6d"
-
-simple-git@^1.100.0:
-  version "1.100.0"
-  resolved "https://registry.yarnpkg.com/simple-git/-/simple-git-1.100.0.tgz#6e781885fcde0e7751cabec0746b2b943ae4cce7"
-  dependencies:
-    debug "^4.0.1"
 
 source-map-support@^0.5.6:
   version "0.5.9"

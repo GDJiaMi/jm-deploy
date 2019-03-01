@@ -2,7 +2,7 @@ export interface ConfigurableKeys {
   // 远程库
   remote: string
   dist: string
-  group?: string
+  target: string
 }
 
 export interface Configuration extends ConfigurableKeys {
@@ -12,3 +12,9 @@ export interface Configuration extends ConfigurableKeys {
 
 export const CONFIG_FILE = 'jm-deploy.json'
 export const WORK_DIR = '.jm-deploy'
+export const IS_CI = process.env.CI === 'true'
+
+export const defaultConf: Partial<ConfigurableKeys> = {
+  dist: 'dist',
+  target: '/',
+}
