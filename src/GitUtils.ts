@@ -9,6 +9,7 @@ import Log from './Log'
 
 const StatusRegexp = /^([ADM? ])([ADM? ])\s(.+)$/
 const LocalBranchRegexp = /^(\*?)\s+(\S*)$/
+const BranchRegexp = /^\s+remotes\/\S+\/(\S+)$|^\*?\s+(\S*)$/
 const VersionTagRegexp = /^(.*)\/(\d+)\.(\d+)\.(\d+.*)$/
 
 export interface BranchDesc {
@@ -104,6 +105,7 @@ export default class GitUtils {
    * 初始化版本库
    */
   public initial() {
+    this.resetStage()
     // 更新状态
     this.switchBranch('master')
     this.updateBranches()
@@ -162,6 +164,19 @@ export default class GitUtils {
       this.Logger.log(cmd)
       cp.execSync(cmd, this.getExecOptions(true))
     }
+  }
+
+  /**
+   * 还原工作区
+   */
+  public resetStage() {
+    let cmd = `git clean -f`
+    this.Logger.log('清空untracked文件', cmd)
+    cp.execSync(cmd, this.getExecOptions(true))
+
+    cmd = `git reset --hard`
+    this.Logger.log('清空staged文件', cmd)
+    cp.execSync(cmd, this.getExecOptions(true))
   }
 
   public checkout(ref: string) {
@@ -230,7 +245,15 @@ export default class GitUtils {
    * 获取当前分支名称
    */
   public getCurrentBranch() {
-    return this.getLocalBranches().find(i => !!i.current)!
+    const branch = this.getLocalBranches().find(i => !!i.current)!
+
+    if (branch == null) {
+      // 当前可能处理checkout在某个提交
+      const branches = this.getBranchMatchCommit('HEAD')
+      return branches[0]
+    }
+
+    return branch.name
   }
 
   public getLocalBranches() {
@@ -256,6 +279,29 @@ export default class GitUtils {
         }
       })
       .filter(i => !!i) as BranchDesc[]
+  }
+
+  /**
+   * 获取匹配指定提交的分支
+   */
+  public getBranchMatchCommit(commit: string) {
+    const cmd = `git branch -a --contains ${commit}`
+    this.Logger.log(cmd)
+    const res = cp.execSync(cmd, this.getExecOptions()).toString()
+    const branches: { [branch: string]: boolean } = {}
+    res.split('\n').forEach(i => {
+      if (i === '') {
+        return null
+      }
+      const matched = i.match(BranchRegexp)
+      if (matched == null) {
+        return matched
+      }
+      const [remoteName, localName] = matched.slice(1)
+      branches[(remoteName || localName) as string] = true
+    })
+
+    return Object.keys(branches)
   }
 
   public getRemoteBranches() {

@@ -1,5 +1,6 @@
 /**
  * 部署程序
+ * TODO: config
  */
 import inquirer from 'inquirer'
 import path from 'path'
@@ -41,7 +42,7 @@ export default async function deploy() {
   // 更新分支
   targetRepo.initial()
   Log.info('初始化并更新分支...')
-  targetRepo.initialBranch(currentBranchName.name)
+  targetRepo.initialBranch(currentBranchName)
   Log.info('资源复制...')
   clearAndCopy(conf.dist, path.join(targetRepoDir, conf.target))
   targetRepo.addAll()
