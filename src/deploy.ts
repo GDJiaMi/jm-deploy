@@ -1,6 +1,5 @@
 /**
  * 部署程序
- * TODO: config
  */
 import inquirer from 'inquirer'
 import path from 'path'
@@ -10,6 +9,15 @@ import GitUtils, { createGitUtils } from './GitUtils'
 import { getOrCreateWorkDir, getTempFileSync, clearAndCopy, parseVersion, Version } from './utils'
 import getConfig from './config'
 
+const VERSION_TAG_REGEXP = /^v\d+\.\d+\.\d+.*$/
+const FORMAL_RELEASE_TAG_REGEXP = /^v\d+\.\d+\.\d+.*@(.+)$/
+const RELEASE_BRANCH_REGEXP = /^release\/(.*)$/
+
+enum DeployType {
+  ByTag,
+  ByBranch,
+}
+
 async function updateTags(repo: GitUtils, name: string, version: Version) {
   const { major, minor, patch } = version
   const tagName = `${name}/${major}.${minor}.${patch}`
@@ -17,6 +25,38 @@ async function updateTags(repo: GitUtils, name: string, version: Version) {
   const latestTag = tags[0]
 
   repo.addOrReplaceTag(tagName)
+}
+
+/**
+ * 检测是否需要进行部署
+ */
+function shouldDeploy(branch: string, tags?: string[]): [boolean, DeployType] {
+  if (tags && tags.some(i => !!i.match(VERSION_TAG_REGEXP))) {
+    return [true, DeployType.ByTag]
+  }
+
+  return [!!branch.match(RELEASE_BRANCH_REGEXP), DeployType.ByBranch]
+}
+
+/**
+ * 获取推送的目标目录
+ */
+function getTargetBranch(type: DeployType, branch: string, tags?: string[]): string {
+  if (type === DeployType.ByBranch) {
+    Log.info(`检测到发布分支: ${branch}`)
+    return branch
+  }
+
+  for (const tag of tags!) {
+    const matched = tag!.match(FORMAL_RELEASE_TAG_REGEXP)
+
+    if (matched) {
+      Log.info(`检测到发布tag: ${tag}`)
+      return `release/${matched[1]}`
+    }
+  }
+
+  return 'master'
 }
 
 export default async function deploy() {
@@ -38,12 +78,23 @@ export default async function deploy() {
   const targetRepo = createGitUtils(targetRepoDir, conf.remote, 'origin')
   const localRepo = createGitUtils(cwd)
   const currentBranchName = localRepo.getCurrentBranch()
+  const currentTag = localRepo.getCurrentTag()
   Log.info('初始化项目...')
+
+  // 判断是否需要部署
+  const [shouldContinue, deployType] = shouldDeploy(currentBranchName, currentTag)
+  if (!shouldContinue) {
+    Log.info(`非发布分支(${currentBranchName})且没有检测到release tag(${currentTag}), 跳过deploy`)
+    return
+  }
+
+  const targetBranch = getTargetBranch(deployType, currentBranchName, currentTag)
+
   // 更新分支
   targetRepo.initial()
-  Log.info('初始化并更新分支...')
-  targetRepo.initialBranch(currentBranchName)
-  Log.info('资源复制...')
+  Log.info(`初始化并更新分支-${targetBranch}...`)
+  targetRepo.initialBranch(targetBranch)
+  Log.info(`资源复制(to ${conf.target})...`)
   clearAndCopy(conf.dist, path.join(targetRepoDir, conf.target))
   targetRepo.addAll()
 

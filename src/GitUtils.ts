@@ -256,6 +256,13 @@ export default class GitUtils {
     return branch.name
   }
 
+  /**
+   * 获取最新提交的tag
+   */
+  public getCurrentTag(): string[] | undefined {
+    return this.getTagMatchCommit('HEAD')
+  }
+
   public getLocalBranches() {
     const cmd = `git branch`
     this.Logger.log(cmd)
@@ -287,7 +294,7 @@ export default class GitUtils {
   public getBranchMatchCommit(commit: string) {
     const cmd = `git branch -a --contains ${commit}`
     this.Logger.log(cmd)
-    const res = cp.execSync(cmd, this.getExecOptions()).toString()
+    const res = cp.execSync(cmd, this.getExecOptions(true)).toString()
     const branches: { [branch: string]: boolean } = {}
     res.split('\n').forEach(i => {
       if (i === '') {
@@ -302,6 +309,25 @@ export default class GitUtils {
     })
 
     return Object.keys(branches)
+  }
+
+  /**
+   * 获取匹配指定提交的tag
+   */
+  public getTagMatchCommit(commit: string) {
+    try {
+      const cmd = `git tag --points-at ${commit}`
+      this.Logger.log(cmd)
+      const res = cp
+        .execSync(cmd, this.getExecOptions(true))
+        .toString()
+        .trim()
+
+      // 可能存在多个tag
+      return res === '' ? undefined : res.split('\n')
+    } catch {
+      return undefined
+    }
   }
 
   public getRemoteBranches() {
