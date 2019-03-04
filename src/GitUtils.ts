@@ -377,6 +377,29 @@ export default class GitUtils {
     cp.execSync(cmd, this.getExecOptions(true))
   }
 
+  /**
+   * 配置用户信息
+   */
+  public configureUser(name: string, email: string) {
+    const cmd = `git config --local user.name "${name}" && git config --local user.email ${email}`
+    this.Logger.log(cmd)
+    cp.execSync(cmd, this.getExecOptions(true))
+  }
+
+  /**
+   * 判断用户是否已经配置
+   */
+  public isUserConfigured() {
+    const cmd = `git config --local --get user.name`
+    this.Logger.log(cmd)
+    try {
+      const res = cp.execSync(cmd, this.getExecOptions(true)).toString()
+      return res.trim() !== ''
+    } catch (err) {
+      return false
+    }
+  }
+
   public getTags(): string[] {
     const cmd = `git tag --list`
     this.Logger.log(cmd)

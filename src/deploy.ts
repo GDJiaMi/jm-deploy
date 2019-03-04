@@ -57,6 +57,14 @@ export default async function deploy() {
     })
     Log.info('更新tags...')
     await updateTags(targetRepo, conf.name, version)
+
+    if (!targetRepo.isUserConfigured()) {
+      targetRepo.configureUser(
+        process.env.USER || 'jm-deploy',
+        process.env.EMAIL || process.env.GITLAB_USER_EMAIL || 'jm-deploy@ci.com',
+      )
+    }
+
     targetRepo.push(true)
     Log.tip('发布完成!')
   } else {
