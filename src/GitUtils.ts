@@ -67,14 +67,12 @@ export function createGitUtils(repoDir: string, remote?: string, remoteName: str
       // 仓库存在，需要重置remote
       try {
         let cmd = `git remote remove ${remoteName}`
-        Log.log(cmd)
         cp.execSync(cmd, {
           cwd: repoDir,
           stdio: (!Log.enabled && 'ignore') || undefined,
         })
 
         cmd = `git remote add ${remoteName} ${remote} && git fetch`
-        Log.log(cmd)
         cp.execSync(cmd, {
           cwd: repoDir,
           stdio: (!Log.enabled && 'ignore') || undefined,
