@@ -6,6 +6,7 @@ import url from 'url'
 import path from 'path'
 import fs from 'fs-extra'
 import Log from './Log'
+import { IS_CI } from './constants'
 
 const StatusRegexp = /^([ADM? ])([ADM? ])\s(.+)$/
 const LocalBranchRegexp = /^(\*?)\s+(\S*)$/
@@ -57,7 +58,7 @@ export function createGitUtils(repoDir: string, remote?: string, remoteName: str
     if (!fs.existsSync(repoDir)) {
       // 仓库不存在
       const cmd = `git clone ${remote} ${basename}`
-      Log.log(cmd)
+      Log.log(IS_CI ? `git clone xxx ${basename}` : cmd)
       cp.execSync(cmd, {
         cwd: workDir,
         stdio: (!Log.enabled && 'ignore') || undefined,
@@ -67,12 +68,14 @@ export function createGitUtils(repoDir: string, remote?: string, remoteName: str
       // 仓库存在，需要重置remote
       try {
         let cmd = `git remote remove ${remoteName}`
+        Log.log(cmd)
         cp.execSync(cmd, {
           cwd: repoDir,
           stdio: (!Log.enabled && 'ignore') || undefined,
         })
 
         cmd = `git remote add ${remoteName} ${remote} && git fetch`
+        Log.log(IS_CI ? `git remote add ${remoteName} xxx` : cmd)
         cp.execSync(cmd, {
           cwd: repoDir,
           stdio: (!Log.enabled && 'ignore') || undefined,
