@@ -135,7 +135,8 @@ export default async function release() {
 
   localRepo.addAll()
 
-  localRepo.commit(`🎉 release: ${version}\n\n${message}`)
+  const tempFile = getTempFileSync(`🎉 release: ${version}\n\n${message}`)
+  localRepo.commitByFile(tempFile)
 
   // 提交后添加tag
   localRepo.addOrReplaceTag(`v${version}`)
