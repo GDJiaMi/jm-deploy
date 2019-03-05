@@ -540,9 +540,10 @@ export default class GitUtils {
   }
 
   private getExecOptions(quietable: boolean = false, cwd: string = this.repoDir): cp.ExecSyncOptions {
+    const stdout = (quietable && !this.Logger.enabled && 'ignore') || undefined
     return {
       cwd,
-      stdio: (quietable && !this.Logger.enabled && 'ignore') || undefined,
+      stdio: ['pipe', stdout, 'pipe'],
     }
   }
 }

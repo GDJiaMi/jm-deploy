@@ -1,6 +1,6 @@
 {
   "name": "jm-deploy",
-  "version": "0.2.5",
+  "version": "0.3.0",
   "description": "CLI for deploy static to git repo.",
   "main": "bin/index.js",
   "bin": "bin/index.js",
@@ -25,18 +25,23 @@
   "author": "ivan",
   "license": "ISC",
   "devDependencies": {
+    "@types/fs-extra": "^5.0.4",
     "@types/glob": "^5.0.35",
     "@types/inquirer": "^0.0.43",
+    "@types/merge-stream": "^1.1.2",
     "@types/node": "^10.10.1",
-    "@types/fs-extra": "^5.0.4",
+    "@types/tempfile": "^2.0.0",
     "ts-node": "^7.0.1",
     "typescript": "~2.9.0"
   },
   "dependencies": {
     "commander": "^2.18.0",
+    "conventional-changelog": "^3.0.6",
+    "conventional-changelog-gzb": "^1.0.0",
     "fs-extra": "^7.0.0",
     "glob": "^7.1.3",
     "inquirer": "^6.2.0",
+    "tempfile": "^2.0.0",
     "tslib": "^1.9.3"
   }
 }

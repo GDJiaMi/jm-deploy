@@ -1,12 +1,11 @@
 /**
  * 部署程序
  */
-import inquirer from 'inquirer'
 import path from 'path'
 import url from 'url'
 import Log from './Log'
 import GitUtils, { createGitUtils } from './GitUtils'
-import { getOrCreateWorkDir, getTempFileSync, clearAndCopy, parseVersion, Version } from './utils'
+import { getOrCreateWorkDir, clearAndCopy, parseVersion, Version } from './utils'
 import getConfig from './config'
 
 const VERSION_TAG_REGEXP = /^v\d+\.\d+\.\d+.*$/
@@ -103,9 +102,7 @@ export default async function deploy() {
     const lastMessage = localRepo.getLastCommitMessage()
     const message = `${lastMessage.title}${!!lastMessage.body ? '\n' + lastMessage.body : ''}`
     Log.info('开始提交...')
-    getTempFileSync(message, file => {
-      targetRepo.commitByFile(file)
-    })
+    targetRepo.commit(message)
     Log.info('更新tags...')
     await updateTags(targetRepo, conf.name, version)
 
