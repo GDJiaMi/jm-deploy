@@ -341,10 +341,10 @@ conventional-changelog-express@^2.0.1:
   dependencies:
     q "^1.5.1"
 
-conventional-changelog-gzb@^1.0.0:
-  version "1.0.0"
-  resolved "http://registry.npm.taobao.org/conventional-changelog-gzb/download/conventional-changelog-gzb-1.0.0.tgz#67357537c7808eafed35fec5fcaaf210a65f0702"
-  integrity sha1-ZzV1N8eAjq/tNf7F/KryEKZfBwI=
+conventional-changelog-gzb@^1.0.1:
+  version "1.0.1"
+  resolved "http://registry.npm.taobao.org/conventional-changelog-gzb/download/conventional-changelog-gzb-1.0.1.tgz#a175d669e2c3d2b3a14a08b5b6827516a0d1a93e"
+  integrity sha1-oXXWaeLD0rOhSgi1toJ1FqDRqT4=
   dependencies:
     compare-func "^1.3.1"
     q "^1.5.1"
