@@ -25,12 +25,15 @@ export interface StatusDesc {
   unstagedStatus: FileStatus
 }
 
-export interface VersionTagDesc {
-  raw: string
-  name: string
+export interface VersionDesc {
   major: number
   minor: number
   patch: number
+}
+
+export interface VersionTagDesc extends VersionDesc {
+  raw: string
+  name: string
 }
 
 export enum FileStatus {
@@ -96,6 +99,34 @@ export default class GitUtils {
   public verbose: boolean = false
   public focusedBranch: string = 'master'
   public Logger = Log
+
+  public static versionComparator(a: VersionDesc, b: VersionDesc) {
+    if (a.major > b.major) {
+      return 1
+    } else if (a.major < b.major) {
+      return -1
+    } else {
+      if (a.minor > b.minor) {
+        return 1
+      } else if (a.minor < b.minor) {
+        return -1
+      } else {
+        return a.patch - b.patch
+      }
+    }
+  }
+
+  /**
+   * tag 版本号比较
+   */
+  public static isNewerThan(a: VersionDesc, b: VersionDesc) {
+    return this.versionComparator(a, b) === 1
+  }
+
+  public static isNewerOrEqualThan(a: VersionDesc, b: VersionDesc) {
+    const res = this.versionComparator(a, b)
+    return res === 1 || res === 0
+  }
 
   public constructor(repoDir: string, remoteName: string = 'origin') {
     this.repoDir = repoDir
@@ -182,6 +213,16 @@ export default class GitUtils {
 
   public checkout(ref: string) {
     const cmd = `git checkout ${ref}`
+    this.Logger.log(cmd)
+    cp.execSync(cmd, this.getExecOptions(true))
+  }
+
+  /**
+   * 分支合并
+   * @param ref 分支或提交
+   */
+  public merge(ref: string) {
+    const cmd = `git merge ${ref}`
     this.Logger.log(cmd)
     cp.execSync(cmd, this.getExecOptions(true))
   }
@@ -398,8 +439,8 @@ export default class GitUtils {
       .filter(i => !!i) as StatusDesc[]
   }
 
-  public push(force?: boolean) {
-    const cmd = `git push -u --tags ${this.remoteName} ${this.focusedBranch} ${force ? '-f' : ''}`
+  public push(force: boolean = false, branch: string = this.focusedBranch) {
+    const cmd = `git push -u --tags ${this.remoteName} ${branch} ${force ? '-f' : ''}`
     this.Logger.log(cmd)
     cp.execSync(cmd, this.getExecOptions(true))
   }
@@ -449,35 +490,7 @@ export default class GitUtils {
   public getTagsAndSortByVersion(path: string): VersionTagDesc[] {
     return (this.getTagsStartWith(path)
       .map(tag => this.getVersionOnTag(tag))
-      .filter(v => !!v) as VersionTagDesc[]).sort((a, b) => this.versionComparator(b, a))
-  }
-
-  public versionComparator(a: VersionTagDesc, b: VersionTagDesc) {
-    if (a.major > b.major) {
-      return 1
-    } else if (a.major < b.major) {
-      return -1
-    } else {
-      if (a.minor > b.minor) {
-        return 1
-      } else if (a.minor < b.minor) {
-        return -1
-      } else {
-        return a.patch - b.patch
-      }
-    }
-  }
-
-  /**
-   * tag 版本号比较
-   */
-  public isNewerThan(a: VersionTagDesc, b: VersionTagDesc) {
-    return this.versionComparator(a, b) === 1
-  }
-
-  public isNewerOrEqualThan(a: VersionTagDesc, b: VersionTagDesc) {
-    const res = this.versionComparator(a, b)
-    return res === 1 || res === 0
+      .filter(v => !!v) as VersionTagDesc[]).sort((a, b) => GitUtils.versionComparator(b, a))
   }
 
   public getVersionOnTag(tag: string) {

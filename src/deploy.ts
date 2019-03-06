@@ -8,9 +8,9 @@ import GitUtils, { createGitUtils } from './GitUtils'
 import { getOrCreateWorkDir, clearAndCopy, parseVersion, Version, getTempFileSync } from './utils'
 import getConfig from './config'
 
-const VERSION_TAG_REGEXP = /^v\d+\.\d+\.\d+.*$/
-const FORMAL_RELEASE_TAG_REGEXP = /^v\d+\.\d+\.\d+.*@(.+)$/
-const RELEASE_BRANCH_REGEXP = /^release\/(.*)$/
+export const VERSION_TAG_REGEXP = /^v\d+\.\d+\.\d+.*$/
+export const FORMAL_RELEASE_TAG_REGEXP = /^v\d+\.\d+\.\d+.*@(.+)$/
+export const RELEASE_BRANCH_REGEXP = /^release\/(.*)$/
 
 enum DeployType {
   ByTag,
