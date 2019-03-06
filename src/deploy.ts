@@ -20,8 +20,6 @@ enum DeployType {
 async function updateTags(repo: GitUtils, name: string, version: Version) {
   const { major, minor, patch } = version
   const tagName = `${name}/${major}.${minor}.${patch}`
-  const tags = repo.getTagsAndSortByVersion(name)
-  const latestTag = tags[0]
 
   repo.addOrReplaceTag(tagName)
 }
@@ -30,11 +28,11 @@ async function updateTags(repo: GitUtils, name: string, version: Version) {
  * 检测是否需要进行部署
  */
 function shouldDeploy(branch: string, tags?: string[]): [boolean, DeployType] {
-  if (tags && tags.some(i => !!i.match(VERSION_TAG_REGEXP))) {
-    return [true, DeployType.ByTag]
+  if (!!branch.match(RELEASE_BRANCH_REGEXP)) {
+    return [true, DeployType.ByBranch]
   }
 
-  return [!!branch.match(RELEASE_BRANCH_REGEXP), DeployType.ByBranch]
+  return [!!tags && tags.some(i => !!i.match(VERSION_TAG_REGEXP)), DeployType.ByTag]
 }
 
 /**
@@ -76,9 +74,10 @@ export default async function deploy() {
   // 克隆远程版本库
   const targetRepo = createGitUtils(targetRepoDir, conf.remote, 'origin')
   const localRepo = createGitUtils(cwd)
-  const currentBranchName = localRepo.getCurrentBranch()
-  const currentTag = localRepo.getCurrentTag()
-  Log.info('初始化项目...')
+  const currentBranchName =
+    (process.env.CI_BUILD_TAG == null && process.env.CI_BUILD_REF_NAME) || localRepo.getCurrentBranch()
+  const currentTag = process.env.CI_BUILD_TAG ? [process.env.CI_BUILD_TAG] : localRepo.getCurrentTag()
+  Log.info(`初始化项目(当前分支:${currentBranchName}, 当前tag: ${currentTag})...`)
 
   // 判断是否需要部署
   const [shouldContinue, deployType] = shouldDeploy(currentBranchName, currentTag)
