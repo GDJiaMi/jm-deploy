@@ -2,6 +2,7 @@ import cp from 'child_process'
 import path from 'path'
 import conventionalChangelog from 'conventional-changelog'
 import inquirer, { ChoiceType } from 'inquirer'
+import uniqBy from 'lodash/uniqBY'
 import GitUtils, { createGitUtils, VersionDesc } from './GitUtils'
 import { getPkg, getTempFileSync } from './utils'
 import Log from './Log'
@@ -84,7 +85,7 @@ function updateChangeLog(message: string) {
 }
 
 function getReleaseBranches(repo: GitUtils) {
-  const all = repo.getAllBranches()
+  const all = uniqBy(repo.getAllBranches(), i => i.name)
   const release: Array<{
     name: string
     version: VersionDesc
@@ -135,7 +136,7 @@ export default async function release() {
       {
         type: 'input',
         name: 'version',
-        message: '请指定版本号: ',
+        message: `请指定版本号(当前版本: ${pkg.version}): `,
         validate: (input: string) => {
           if (input.match(VERSION_REGEXP) == null) {
             return '请输入规范版本号'
@@ -225,7 +226,7 @@ export default async function release() {
     localRepo.createBranch(selectedReleaseBranch!, '', false)
   } else {
     localRepo.switchBranch(selectedReleaseBranch!, false)
-    localRepo.merge(currentBranch)
+    localRepo.mergeNoFF(currentBranch, tempFile)
   }
 
   // 确定是否提交

@@ -227,6 +227,12 @@ export default class GitUtils {
     cp.execSync(cmd, this.getExecOptions(true))
   }
 
+  public mergeNoFF(ref: string, messageFile?: string) {
+    const cmd = `git merge --no-ff --file ${messageFile} ${ref}`
+    this.Logger.log(cmd)
+    cp.execSync(cmd, this.getExecOptions(true))
+  }
+
   public addAll() {
     const cmd = `git add .`
     this.Logger.log(cmd)

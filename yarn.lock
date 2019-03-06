@@ -27,6 +27,11 @@
     "@types/rx" "*"
     "@types/through" "*"
 
+"@types/lodash@^4.14.122":
+  version "4.14.122"
+  resolved "http://registry.npm.taobao.org/@types/lodash/download/@types/lodash-4.14.122.tgz#3e31394c38cf1e5949fb54c1192cbc406f152c6c"
+  integrity sha1-PjE5TDjPHllJ+1TBGSy8QG8VLGw=
+
 "@types/merge-stream@^1.1.2":
   version "1.1.2"
   resolved "http://registry.npm.taobao.org/@types/merge-stream/download/@types/merge-stream-1.1.2.tgz#a880ff66b1fbbb5eef4958d015c5947a9334dbb1"
