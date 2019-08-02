@@ -4,21 +4,60 @@
 
 ## Install
 
-```
-npm i -g jm-deploy
+```shell
+yarn global add jm-deploy
+
+# 或者作为本地依赖
+yarn add jm-deploy -D
 ```
 
 ## Usage
 
 ### 初始化项目
 
-```
+```shell
 jm-deploy init
 ```
 
-命令会提交输入`远程版本库的地址`以及前端编译后的`静态资源的目录`. 并在项目根目录下创建`jm-deploy.json`配置文件.
+命令会提交输入`远程版本库的地址`以及前端编译后的`静态资源的目录`. 并在项目根目录下创建`jm-deploy.json`配置文件.支持以下配置项:
+
+```json
+{
+  "dist": "当前项目需要提交的静态文件, 默认为dist",
+  "target": "拷贝到部署仓库的目录，默认是/",
+  "remote": "部署仓库, 支持使用${ENV}内嵌环境变量"
+}
+```
+
+示例:
+
+```json
+{
+  "dist": "build",
+  "target": "awesome-project",
+  "remote": "http://gitlab-ci-token:${CI_BUILD_TOKEN}@code.ejiahe.com:82/gq-li/test-deploy.git"
+}
+```
 
 ### 发布
+
+使用`jm-deploy release`, 来进行自动化发布。自动化发布主要有以下流程:
+
+1. 指定版本号。每一次发布都需要指定一个新的版本，这个版本号遵循semver规范
+2. 生成CHANGELOG
+3. 弹出编辑器对生成的CHANGELOG进行二次编辑, 它也将作为git commit message
+4. 将CHANGELOG追加到CHANGELOG.md中
+5. 提交, 打上版本tag
+6. 选择或创建发布的release分支
+7. 合并到release分支
+8. 推送到远程版本库
+9. 推送到远程版本库之后就会开始跑CI构建
+
+> 为了生成CHANGELOG，提交信息必须符合[规范](https://github.com/GDJiaMi/frontend-standards/blob/master/development.md#%E6%8F%90%E4%BA%A4%E4%BF%A1%E6%81%AF%E8%A7%84%E8%8C%83)
+
+### 交付
+
+> 只在进行交付的情况下调用该命令。不要每个提交都进行调用
 
 ```
 jm-deploy deploy
@@ -28,33 +67,20 @@ jm-deploy -v deploy
 
 将指定的前端资源目录下的文件提交到远程版本库。大概会经历一下步骤:
 
-1. 初始化远程版本库，创建或更新分支. 分支名称使用`package.json`的 name 字段
-2. 清空版本库文件，并将新的资源文件拷贝到版本库
-3. 提交，并根据`package.json`的 verison 字段生成 tag，例如`appName/1.1.8`和`appName/1.1.x`. 后者我们成为`X版本`
-4. 生成`appName/latest` 或 `group/groupname/appName`(如果属于某个分组) 标签，这个标签总是指向最新的版本。
-   这个机制是为了让同一个分组的应用，大版本总能保持一致
+1. 初始化或更新远程部署版本库.
+2. 创建或更新分支. 策略如下:
 
-**设置提交信息**<br/>
-当 jm-deploy 准备提交时会显示最近的提交信息列表供选择，然后根据你的选择生成一个提交信息模板。这个模板会通过
-编辑器打开，以供二次编辑。编辑器依赖于`EDITOR`环境变量，在 Mac 或 Linux 下面默认为`Vim`, 在 Windows 下面默认为`记事本`.
-经过测试，在 Windows 下面推荐使用`Notepad++`, 以避免信息丢失和乱码.
+   - 推送了携带 tag 的提交，例如 v1.0.0, 会将构建推送到部署版本库的 master 分支
+   - tag 提交为 v1.0.0@6.6 形式。这是正式发布 tag。jm-deploy 会从 master 分支 checkout 出一个 release/6.6 分支, 将静态资源推送到这个分支
+   - release/6.6 形式的分支更新。同上
 
-**应用分组管理**</br>
-在实际应用场景中，存在多个前端应用隶属于一个 Java 后端的情况，但是前端应用更新的频率是不一致的，导致一些应用版本
-无法和后端的大版本保持一致。为了避免手动去管理这些 tag，为此提出了`应用分组`的概念。同一个应用分组内的应用的`X版本`总是保持一致的。
+3. 清空版本库文件/或指定目录(由 target 指定)，并将新的资源文件拷贝到部署版本库
+4. 提交，并根据`package.json`的 verison 字段生成 tag，例如`appName/1.1.8`
 
-其原理是只要分组内的一个应用版本领先了，就会检查和更新同一个分组其他应用的 tag。后续其他应用变动，再惰性跟上大版本.
+所以部署版本库大致有两种类型的分支:
 
-![group](images/group.png)
-
-分组可以通过配置文件的`group`字段指定
-
-## 约定
-
-1. 前后端大版本强制绑定(待实践)
-2. 提交信息要说明发布情况。deploy 命令有提供模板
-
-[更多信息](spec.md)
+- master 分支: 在这个分支始终可以获取到最新的代码
+- release/\* 分支: 获取指定工作包版本的代码. 例如`release/6.6`
 
 ## License
 

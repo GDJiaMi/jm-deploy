@@ -1,100 +1,59 @@
 /**
  * 部署程序
  */
-import inquirer from 'inquirer'
 import path from 'path'
 import url from 'url'
 import Log from './Log'
 import GitUtils, { createGitUtils } from './GitUtils'
-import template from './template'
-import { getOrCreateWorkDir, getTempFileSync, clearAndCopy, parseVersion, Version } from './utils'
+import { getOrCreateWorkDir, clearAndCopy, parseVersion, Version, getTempFileSync } from './utils'
 import getConfig from './config'
-import { Configuration } from './constants'
 
-async function generateCommitMessage(repo: GitUtils, conf: Configuration, override: boolean) {
-  const lastNCommit = repo.getLastCommitMessageTitles(10)
-  if (lastNCommit.length < 2) {
-    return template({
-      override,
-      name: conf.name,
-      version: conf.version,
-      title: lastNCommit[0],
-    })
-  } else {
-    const ans = await inquirer.prompt<{ commits: string[] }>([
-      { type: 'checkbox', name: 'commits', message: '选择需要提交的信息: ', choices: lastNCommit },
-    ])
-    return template({
-      override,
-      name: conf.name,
-      version: conf.version,
-      title: lastNCommit[0],
-      body: ans.commits.map(m => `* ${m}`).join('\n'),
-    })
-  }
+export const VERSION_TAG_REGEXP = /^v\d+\.\d+\.\d+.*$/
+export const FORMAL_RELEASE_TAG_REGEXP = /^v\d+\.\d+\.\d+.*@(.+)$/
+export const RELEASE_BRANCH_REGEXP = /^release\/(.*)$/
+
+enum DeployType {
+  ByTag,
+  ByBranch,
 }
 
-async function editCommitMessage(defaultMessage: string) {
-  const ans = await inquirer.prompt<{ message: string }>([
-    {
-      type: 'editor',
-      name: 'message',
-      message: '确认提交信息: ',
-      default: defaultMessage,
-      validate: (v: string) => {
-        if (v == null || v.trim() === '') {
-          return '不能为空'
-        }
-        return true
-      },
-    },
-  ])
-  return ans.message
-}
-
-async function checkVersionConflit(repo: GitUtils, name: string, version: Version) {
+async function updateTags(repo: GitUtils, name: string, version: Version) {
   const { major, minor, patch } = version
   const tagName = `${name}/${major}.${minor}.${patch}`
-  if (repo.hasTag(tagName)) {
-    // 冲突了
-    const ans = await inquirer.prompt<{ ok: boolean }>({
-      type: 'confirm',
-      message: `版本: ${tagName} 已经存在, 是否覆盖? 注意避免覆盖, 尽量和后端应用的大版本保持一致: `,
-      name: 'ok',
-    })
-
-    if (!ans.ok) {
-      process.exit(0)
-    }
-
-    return true
-  }
-  return false
-}
-
-async function updateTags(repo: GitUtils, name: string, version: Version, group?: string) {
-  const { major, minor, patch } = version
-  const tagName = `${name}/${major}.${minor}.${patch}`
-  const wideTagName = `${name}/${major}.${minor}.x`
-  const latestTagName = `${name}/latest`
-  const tags = repo.getTagsAndSortByVersion(name)
-  const latestTag = tags[0]
-
-  // 不存在最新tag
-  // 或者覆盖模式，最新tag等于当前tag
-  // 或者当前tag新于最新tag
-  if (
-    latestTag == null ||
-    latestTag.raw === tagName ||
-    repo.isNewerOrEqualThan(repo.getVersionOnTag(tagName)!, latestTag)
-  ) {
-    // 更新最新标志
-    Log.info(`更新${latestTagName}...`)
-    repo.addOrReplaceTag(latestTagName)
-  }
 
   repo.addOrReplaceTag(tagName)
-  repo.addOrReplaceTag(wideTagName)
+}
+
+/**
+ * 检测是否需要进行部署
+ */
+function shouldDeploy(branch: string, tags?: string[]): [boolean, DeployType] {
+  if (!!branch.match(RELEASE_BRANCH_REGEXP)) {
+    return [true, DeployType.ByBranch]
+  }
+
+  return [!!tags && tags.some(i => !!i.match(VERSION_TAG_REGEXP)), DeployType.ByTag]
+}
+
+/**
+ * 获取推送的目标目录
+ */
+function getTargetBranch(type: DeployType, branch: string, tags?: string[]): string {
+  if (type === DeployType.ByBranch) {
+    Log.info(`检测到发布分支: ${branch}`)
+    return branch
+  }
+
+  for (const tag of tags!) {
+    const matched = tag!.match(FORMAL_RELEASE_TAG_REGEXP)
+
+    if (matched) {
+      Log.info(`检测到发布tag: ${tag}`)
+      return `release/${matched[1]}`
+    }
+  }
+
+  return 'master'
 }
 
 export default async function deploy() {
@@ -103,7 +62,7 @@ export default async function deploy() {
   const workdir = getOrCreateWorkDir()
   const pathname = url.parse(conf.remote).pathname || '/repo'
   const basename = path.basename(pathname, '.git')
-  const repoDir = path.join(workdir, basename)
+  const targetRepoDir = path.join(workdir, basename)
   const version = parseVersion(conf.version)
 
   if (version == null) {
@@ -112,28 +71,49 @@ export default async function deploy() {
     return
   }
 
-  const repo = createGitUtils(repoDir, conf.remote, 'origin')
+  // 克隆远程版本库
+  const targetRepo = createGitUtils(targetRepoDir, conf.remote, 'origin')
   const localRepo = createGitUtils(cwd)
-  Log.info('初始化项目...')
-  repo.initial()
-  Log.info('初始化并更新分支...')
-  repo.initialBranch(conf.name)
-  Log.info('检查版本冲突...')
-  const override = await checkVersionConflit(repo, conf.name, version)
-  Log.info('资源复制...')
-  clearAndCopy(conf.dist, repoDir)
-  repo.addAll()
+  const currentBranchName =
+    (process.env.CI_BUILD_TAG == null && process.env.CI_BUILD_REF_NAME) || localRepo.getCurrentBranch()
+  const currentTag = process.env.CI_BUILD_TAG ? [process.env.CI_BUILD_TAG] : localRepo.getCurrentTag()
+  Log.info(`初始化项目(当前分支:${currentBranchName}, 当前tag: ${currentTag})...`)
 
-  if (repo.shouldCommit()) {
-    const defaultMessage = await generateCommitMessage(localRepo, conf, override)
-    const message = await editCommitMessage(defaultMessage)
+  // 判断是否需要部署
+  const [shouldContinue, deployType] = shouldDeploy(currentBranchName, currentTag)
+  if (!shouldContinue) {
+    Log.info(`非发布分支(${currentBranchName})且没有检测到release tag(${currentTag}), 跳过deploy`)
+    return
+  }
+
+  const targetBranch = getTargetBranch(deployType, currentBranchName, currentTag)
+
+  // 更新分支
+  targetRepo.initial()
+  Log.info(`初始化并更新分支-${targetBranch}...`)
+  targetRepo.initialBranch(targetBranch)
+  Log.info(`资源复制(to ${conf.target})...`)
+  clearAndCopy(conf.dist, path.join(targetRepoDir, conf.target))
+  targetRepo.addAll()
+
+  // 提交代码
+  if (targetRepo.shouldCommit()) {
+    const lastMessage = localRepo.getLastCommitMessage()
+    const message = `${lastMessage.title}${!!lastMessage.body ? '\n' + lastMessage.body : ''}`
     Log.info('开始提交...')
-    getTempFileSync(message, file => {
-      repo.commitByFile(file)
-    })
+    const tempFile = getTempFileSync(message)
+    targetRepo.commitByFile(tempFile)
     Log.info('更新tags...')
-    await updateTags(repo, conf.name, version, conf.group)
-    repo.push(true)
+    await updateTags(targetRepo, conf.name, version)
+
+    if (!targetRepo.isUserConfigured()) {
+      targetRepo.configureUser(
+        process.env.USER || 'jm-deploy',
+        process.env.EMAIL || process.env.GITLAB_USER_EMAIL || 'jm-deploy@ci.com',
+      )
+    }
+
+    targetRepo.push(true)
     Log.tip('发布完成!')
   } else {
     Log.tip('暂无提交内容，退出')

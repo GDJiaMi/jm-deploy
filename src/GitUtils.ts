@@ -6,9 +6,11 @@ import url from 'url'
 import path from 'path'
 import fs from 'fs-extra'
 import Log from './Log'
+import { IS_CI } from './constants'
 
 const StatusRegexp = /^([ADM? ])([ADM? ])\s(.+)$/
 const LocalBranchRegexp = /^(\*?)\s+(\S*)$/
+const BranchRegexp = /^\s+remotes\/\S+\/(\S+)$|^\*?\s+(\S*)$/
 const VersionTagRegexp = /^(.*)\/(\d+)\.(\d+)\.(\d+.*)$/
 
 export interface BranchDesc {
@@ -23,12 +25,15 @@ export interface StatusDesc {
   unstagedStatus: FileStatus
 }
 
-export interface VersionTagDesc {
-  raw: string
-  name: string
+export interface VersionDesc {
   major: number
   minor: number
   patch: number
+}
+
+export interface VersionTagDesc extends VersionDesc {
+  raw: string
+  name: string
 }
 
 export enum FileStatus {
@@ -56,11 +61,32 @@ export function createGitUtils(repoDir: string, remote?: string, remoteName: str
     if (!fs.existsSync(repoDir)) {
       // 仓库不存在
       const cmd = `git clone ${remote} ${basename}`
-      Log.log(cmd)
+      Log.log(IS_CI ? `git clone xxx ${basename}` : cmd)
       cp.execSync(cmd, {
         cwd: workDir,
         stdio: (!Log.enabled && 'ignore') || undefined,
       })
+    } else {
+      const repoDir = path.join(workDir, basename)
+      // 仓库存在，需要重置remote
+      try {
+        let cmd = `git remote remove ${remoteName}`
+        Log.log(cmd)
+        cp.execSync(cmd, {
+          cwd: repoDir,
+          stdio: (!Log.enabled && 'ignore') || undefined,
+        })
+
+        cmd = `git remote add ${remoteName} ${remote} && git fetch`
+        Log.log(IS_CI ? `git remote add ${remoteName} xxx` : cmd)
+        cp.execSync(cmd, {
+          cwd: repoDir,
+          stdio: (!Log.enabled && 'ignore') || undefined,
+        })
+      } catch (err) {
+        Log.log(`重置remote失败:`, err)
+        process.exit(1)
+      }
     }
   }
 
@@ -74,6 +100,34 @@ export default class GitUtils {
   public focusedBranch: string = 'master'
   public Logger = Log
 
+  public static versionComparator(a: VersionDesc, b: VersionDesc) {
+    if (a.major > b.major) {
+      return 1
+    } else if (a.major < b.major) {
+      return -1
+    } else {
+      if (a.minor > b.minor) {
+        return 1
+      } else if (a.minor < b.minor) {
+        return -1
+      } else {
+        return a.patch - b.patch
+      }
+    }
+  }
+
+  /**
+   * tag 版本号比较
+   */
+  public static isNewerThan(a: VersionDesc, b: VersionDesc) {
+    return this.versionComparator(a, b) === 1
+  }
+
+  public static isNewerOrEqualThan(a: VersionDesc, b: VersionDesc) {
+    const res = this.versionComparator(a, b)
+    return res === 1 || res === 0
+  }
+
   public constructor(repoDir: string, remoteName: string = 'origin') {
     this.repoDir = repoDir
     this.remoteName = remoteName
@@ -83,6 +137,7 @@ export default class GitUtils {
    * 初始化版本库
    */
   public initial() {
+    this.resetStage()
     // 更新状态
     this.switchBranch('master')
     this.updateBranches()
@@ -143,8 +198,37 @@ export default class GitUtils {
     }
   }
 
+  /**
+   * 还原工作区
+   */
+  public resetStage() {
+    let cmd = `git clean -f`
+    this.Logger.log('清空untracked文件', cmd)
+    cp.execSync(cmd, this.getExecOptions(true))
+
+    cmd = `git reset --hard`
+    this.Logger.log('清空staged文件', cmd)
+    cp.execSync(cmd, this.getExecOptions(true))
+  }
+
   public checkout(ref: string) {
     const cmd = `git checkout ${ref}`
+    this.Logger.log(cmd)
+    cp.execSync(cmd, this.getExecOptions(true))
+  }
+
+  /**
+   * 分支合并
+   * @param ref 分支或提交
+   */
+  public merge(ref: string) {
+    const cmd = `git merge ${ref}`
+    this.Logger.log(cmd)
+    cp.execSync(cmd, this.getExecOptions(true))
+  }
+
+  public mergeNoFF(ref: string, messageFile?: string) {
+    const cmd = `git merge --no-ff --file ${messageFile} ${ref}`
     this.Logger.log(cmd)
     cp.execSync(cmd, this.getExecOptions(true))
   }
@@ -205,6 +289,28 @@ export default class GitUtils {
     return this.getLocalBranches().concat(this.getRemoteBranches())
   }
 
+  /**
+   * 获取当前分支名称
+   */
+  public getCurrentBranch() {
+    const branch = this.getLocalBranches().find(i => !!i.current)!
+
+    if (branch == null) {
+      // 当前可能处理checkout在某个提交
+      const branches = this.getBranchMatchCommit('HEAD')
+      return branches[0]
+    }
+
+    return branch.name
+  }
+
+  /**
+   * 获取最新提交的tag
+   */
+  public getCurrentTag(): string[] | undefined {
+    return this.getTagMatchCommit('HEAD')
+  }
+
   public getLocalBranches() {
     const cmd = `git branch`
     this.Logger.log(cmd)
@@ -228,6 +334,48 @@ export default class GitUtils {
         }
       })
       .filter(i => !!i) as BranchDesc[]
+  }
+
+  /**
+   * 获取匹配指定提交的分支
+   */
+  public getBranchMatchCommit(commit: string) {
+    const cmd = `git branch -a --contains ${commit}`
+    this.Logger.log(cmd)
+    const res = cp.execSync(cmd, this.getExecOptions(true)).toString()
+    const branches: { [branch: string]: boolean } = {}
+    res.split('\n').forEach(i => {
+      if (i === '') {
+        return null
+      }
+      const matched = i.match(BranchRegexp)
+      if (matched == null) {
+        return matched
+      }
+      const [remoteName, localName] = matched.slice(1)
+      branches[(remoteName || localName) as string] = true
+    })
+
+    return Object.keys(branches)
+  }
+
+  /**
+   * 获取匹配指定提交的tag
+   */
+  public getTagMatchCommit(commit: string) {
+    try {
+      const cmd = `git tag --points-at ${commit}`
+      this.Logger.log(cmd)
+      const res = cp
+        .execSync(cmd, this.getExecOptions(true))
+        .toString()
+        .trim()
+
+      // 可能存在多个tag
+      return res === '' ? undefined : res.split('\n')
+    } catch {
+      return undefined
+    }
   }
 
   public getRemoteBranches() {
@@ -297,10 +445,33 @@ export default class GitUtils {
       .filter(i => !!i) as StatusDesc[]
   }
 
-  public push(force?: boolean) {
-    const cmd = `git push -u --tags ${this.remoteName} ${this.focusedBranch} ${force ? '-f' : ''}`
+  public push(force: boolean = false, branch: string = this.focusedBranch) {
+    const cmd = `git push -u --tags ${this.remoteName} ${branch} ${force ? '-f' : ''}`
     this.Logger.log(cmd)
     cp.execSync(cmd, this.getExecOptions(true))
+  }
+
+  /**
+   * 配置用户信息
+   */
+  public configureUser(name: string, email: string) {
+    const cmd = `git config --local user.name "${name}" && git config --local user.email ${email}`
+    this.Logger.log(cmd)
+    cp.execSync(cmd, this.getExecOptions(true))
+  }
+
+  /**
+   * 判断用户是否已经配置
+   */
+  public isUserConfigured() {
+    const cmd = `git config --local --get user.name`
+    this.Logger.log(cmd)
+    try {
+      const res = cp.execSync(cmd, this.getExecOptions(true)).toString()
+      return res.trim() !== ''
+    } catch (err) {
+      return false
+    }
   }
 
   public getTags(): string[] {
@@ -325,35 +496,7 @@ export default class GitUtils {
   public getTagsAndSortByVersion(path: string): VersionTagDesc[] {
     return (this.getTagsStartWith(path)
       .map(tag => this.getVersionOnTag(tag))
-      .filter(v => !!v) as VersionTagDesc[]).sort((a, b) => this.versionComparator(b, a))
-  }
-
-  public versionComparator(a: VersionTagDesc, b: VersionTagDesc) {
-    if (a.major > b.major) {
-      return 1
-    } else if (a.major < b.major) {
-      return -1
-    } else {
-      if (a.minor > b.minor) {
-        return 1
-      } else if (a.minor < b.minor) {
-        return -1
-      } else {
-        return a.patch - b.patch
-      }
-    }
-  }
-
-  /**
-   * tag 版本号比较
-   */
-  public isNewerThan(a: VersionTagDesc, b: VersionTagDesc) {
-    return this.versionComparator(a, b) === 1
-  }
-
-  public isNewerOrEqualThan(a: VersionTagDesc, b: VersionTagDesc) {
-    const res = this.versionComparator(a, b)
-    return res === 1 || res === 0
+      .filter(v => !!v) as VersionTagDesc[]).sort((a, b) => GitUtils.versionComparator(b, a))
   }
 
   public getVersionOnTag(tag: string) {
@@ -416,9 +559,10 @@ export default class GitUtils {
   }
 
   private getExecOptions(quietable: boolean = false, cwd: string = this.repoDir): cp.ExecSyncOptions {
+    const stdout = (quietable && !this.Logger.enabled && 'ignore') || undefined
     return {
       cwd,
-      stdio: (quietable && !this.Logger.enabled && 'ignore') || undefined,
+      stdio: ['pipe', stdout, 'pipe'],
     }
   }
 }

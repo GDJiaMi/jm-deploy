@@ -1,6 +1,7 @@
 import fs from 'fs-extra'
 import os from 'os'
 import glob from 'glob'
+import tempfile from 'tempfile'
 import Log from './Log'
 import path from 'path'
 import { CONFIG_FILE, WORK_DIR } from './constants'
@@ -44,7 +45,6 @@ export function getOrCreateWorkDir() {
   const workdir = path.join(homeDir, WORK_DIR)
   if (!fs.existsSync(workdir)) {
     fs.mkdirSync(workdir)
-    fs.mkdirSync(path.join(workdir, 'tmp'))
   }
 
   return workdir
@@ -53,15 +53,10 @@ export function getOrCreateWorkDir() {
 /**
  * 获取临时文件并自动删除
  */
-export function getTempFileSync(content: string, wrapper: (filePath: string) => void) {
-  const workdir = getOrCreateWorkDir()
-  const tmpFile = path.join(workdir, 'tmp/template')
-  try {
-    fs.outputFileSync(tmpFile, content)
-    wrapper(tmpFile)
-  } finally {
-    fs.removeSync(tmpFile)
-  }
+export function getTempFileSync(content: string) {
+  const tmpFile = tempfile()
+  fs.outputFileSync(tmpFile, content)
+  return tmpFile
 }
 
 export function clearDir(path: string) {
@@ -95,4 +90,26 @@ export function parseVersion(version: string): Version | null {
   }
   const [major, minor, patch] = macthed.slice(1)
   return { major, minor, patch }
+}
+
+/**
+ * interpolate ${variable} in string
+ */
+export function interpolate(str: string, local: { [key: string]: string | undefined }) {
+  if (str == null) {
+    return ''
+  }
+
+  const matches = str.match(/\$([a-zA-Z0-9_]+)|\${([a-zA-Z0-9_]+)}/g) || []
+
+  matches.forEach(function(match) {
+    const key = match.replace(/\$|{|}/g, '')
+    let variable = local[key] || ''
+    // Resolve recursive interpolations
+    variable = interpolate(variable, local)
+
+    str = str.replace(match, variable)
+  })
+
+  return str
 }

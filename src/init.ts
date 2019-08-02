@@ -1,11 +1,7 @@
 import inquirer from 'inquirer'
 import fs from 'fs-extra'
 import { getConfigFilePath } from './utils'
-import { ConfigurableKeys } from './constants'
-
-const defaultConf: Partial<ConfigurableKeys> = {
-  dist: 'dist',
-}
+import { ConfigurableKeys, defaultConf } from './constants'
 
 export default function init() {
   const configFilePath = getConfigFilePath()
@@ -17,7 +13,6 @@ export default function init() {
     const content = require(configFilePath)
     conf.remote = content.remote || conf.remote
     conf.dist = content.dist || conf.dist
-    conf.group = content.group || conf.group
   }
 
   inquirer
@@ -43,18 +38,22 @@ export default function init() {
       },
       {
         type: 'input',
-        name: 'group',
-        message: '应用分组(相同分组的应用，最新大版本会保持一致):',
-        default: conf.group,
+        name: 'target',
+        message: '放置前端资源的目录',
+        default: conf.target,
       },
     ])
     .then(ans => {
       conf.remote = ans.remote
       conf.dist = ans.dist
-      conf.group = ans.group || undefined
+      conf.target = ans.target
 
       // save
-      fs.writeFileSync(configFilePath, JSON.stringify(filterDefault(conf, defaultConf), undefined, '  '))
+      fs.writeFile(configFilePath, JSON.stringify(filterDefault(conf, defaultConf), undefined, '  '), err => {
+        if (err != null) {
+          console.error(err)
+        }
+      })
     })
 }
 
