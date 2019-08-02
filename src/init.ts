@@ -49,7 +49,11 @@ export default function init() {
       conf.target = ans.target
 
       // save
-      fs.writeFileSync(configFilePath, JSON.stringify(filterDefault(conf, defaultConf), undefined, '  '))
+      fs.writeFile(configFilePath, JSON.stringify(filterDefault(conf, defaultConf), undefined, '  '), err => {
+        if (err != null) {
+          console.error(err)
+        }
+      })
     })
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "jm-deploy",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "description": "CLI for deploy static to git repo.",
   "main": "bin/index.js",
   "bin": "bin/index.js",

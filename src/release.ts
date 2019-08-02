@@ -74,12 +74,13 @@ function updateChangeLog(message: string) {
             .on('finish', res)
         })
     } else {
-      try {
-        fs.writeFileSync(filePath, message)
+      fs.writeFile(filePath, message, err => {
+        if (err != null) {
+          rej(err)
+          return
+        }
         res()
-      } catch (err) {
-        rej(err)
-      }
+      })
     }
   })
 }
